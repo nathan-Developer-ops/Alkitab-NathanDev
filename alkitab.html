@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Alkitab — NathanDev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #161a23;
+    --bg-deep: #13161d;
+    --panel: #1a1e29;
+    --panel-2: #1e2330;
+    --border: #2a2f3c;
+    --border-2: #2f3445;
+    --ink: #e9e2d0;
+    --ink-bright: #f3ecd8;
+    --verse-ink: #dcd5c0;
+    --muted: #9aa0b4;
+    --muted-2: #7d8294;
+    --faint: #565b6c;
+    --gold: #c9a85c;
+    --error: #d98a6a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overscroll-behavior-y: none;
+  }
+  .font-serif { font-family: 'Source Serif 4', Georgia, serif; }
+  ::selection { background: rgba(201,168,92,0.35); }
+
+  a, button, input { font-family: inherit; }
+  button { cursor: pointer; background: none; border: none; color: inherit; }
+  button:focus-visible, input:focus-visible, .focusable:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ===== App shell ===== */
+  .app {
+    display: flex; flex-direction: column;
+    height: 100vh;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(22,26,35,0.97);
+    backdrop-filter: blur(6px);
+    flex-shrink: 0;
+  }
+  @media (min-width: 640px) { header { padding: 12px 24px; } }
+
+  .brand { display: flex; align-items: center; gap: 8px; color: var(--ink); padding: 4px; border-radius: 4px; }
+  .brand span { font-size: 14px; letter-spacing: 0.02em; }
+
+  .current-ref-btn {
+    font-size: 15px; white-space: nowrap; color: var(--ink);
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .current-ref-btn:hover { border-color: rgba(201,168,92,0.5); }
+  .current-ref-btn svg { color: var(--gold); flex-shrink: 0; }
+
+  /* ===== Pages (screens) ===== */
+  .pages { flex: 1; position: relative; overflow: hidden; }
+  .page {
+    position: absolute; inset: 0;
+    overflow-y: auto;
+    display: none;
+  }
+  .page.active { display: block; }
+
+  /* ----- Reader page ----- */
+  main#readerPage { padding: 0 20px; }
+  @media (min-width: 640px) { main#readerPage { padding: 0 40px; } }
+
+  .reader { max-width: 42rem; margin: 0 auto; padding: 28px 0 100px; }
+
+  .eyebrow { font-size: 12px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-2); margin-bottom: 8px; }
+  .chapter-title { font-size: 30px; color: var(--ink-bright); margin: 0 0 20px; }
+  @media (min-width: 640px) { .chapter-title { font-size: 36px; } }
+  .chapter-title .num { color: var(--gold); }
+
+  .loading-row { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; padding: 48px 0; }
+  .error-row { color: var(--error); font-size: 14px; padding: 48px 0; border-left: 2px solid rgba(217,138,106,0.5); padding-left: 16px; }
+  .empty-row { color: var(--muted); font-size: 14px; padding: 48px 0; text-align: center; }
+
+  .verses { font-size: 1.2rem; line-height: 1.85; color: var(--verse-ink); }
+  @media (min-width: 640px) { .verses { font-size: 1.32rem; } }
+  .verse-section-title {
+    display: block; font-family: 'Inter', sans-serif;
+    font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(201,168,92,0.8); margin: 32px 0 12px;
+  }
+  .verse-section-title.first { margin-top: 0; }
+
+  .verse-line {
+    display: flex; align-items: baseline; gap: 0.75em;
+    margin-bottom: 0.1em; padding: 0.1em 0.3em; border-radius: 6px;
+    scroll-margin-top: 24px;
+    transition: background .5s ease;
+  }
+  .verse-num {
+    font-family: 'Inter', sans-serif; font-size: 0.62rem; font-weight: 700;
+    color: var(--bg); background: var(--gold);
+    min-width: 1.6em; text-align: center; line-height: 1.6em;
+    border-radius: 50%; flex-shrink: 0; align-self: flex-start;
+    margin-top: 0.55em; opacity: 0.92;
+  }
+  .verse-text { flex: 1; }
+  .verse-line.verse-highlight { background: linear-gradient(90deg, rgba(201,168,92,0.2), rgba(201,168,92,0.03)); }
+  .verse-line.verse-highlight .verse-num { background: var(--ink-bright); opacity: 1; }
+
+  .chapter-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .chapter-nav button { display: flex; align-items: center; gap: 6px; color: var(--muted); padding: 8px; }
+  .chapter-nav button:hover { color: var(--gold); }
+
+  .footnote { font-size: 11px; color: var(--faint); margin-top: 32px; text-align: center; }
+
+  /* ----- Search page ----- */
+  #searchPage { padding: 0 16px; }
+  .search-page-inner { max-width: 42rem; margin: 0 auto; padding: 20px 0 100px; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+  }
+  .search-box:focus-within { border-color: rgba(201,168,92,0.6); }
+  .search-box input { background: transparent; border: none; outline: none; color: var(--ink); font-size: 15px; width: 100%; }
+  .search-box input::placeholder { color: var(--faint); }
+  .search-box svg { flex-shrink: 0; color: var(--muted-2); }
+  .search-clear-btn { color: var(--muted-2); display: none; }
+  .search-clear-btn.show { display: flex; }
+
+  .search-hint {
+    color: var(--muted); font-size: 13px; padding: 8px 2px 18px;
+  }
+
+  .search-status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; padding: 24px 4px; }
+  .search-empty { color: var(--muted); font-size: 14px; padding: 24px 4px; text-align: center; }
+
+  .search-result-count { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-2); margin: 4px 2px 12px; }
+
+  .search-result-card {
+    width: 100%; text-align: left;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .search-result-card:hover { border-color: rgba(201,168,92,0.45); background: #232839; }
+  .search-result-ref-row { display: flex; align-items: center; gap: 8px; }
+  .search-result-ref-badge {
+    font-size: 11px; font-weight: 700; color: var(--bg); background: var(--gold);
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .search-result-ref-verse { font-size: 12px; color: var(--muted-2); }
+  .search-result-text { font-size: 15px; color: #c4c9d8; line-height: 1.55; }
+  .search-result-text mark { background: rgba(201,168,92,0.32); color: var(--ink-bright); border-radius: 2px; padding: 0 2px; }
+
+  /* ===== Bottom navigation (app-style) ===== */
+  nav.bottom-nav {
+    flex-shrink: 0;
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: rgba(22,26,35,0.98);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .bn-item {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px 8px;
+    color: var(--muted-2);
+  }
+  .bn-item svg { width: 21px; height: 21px; }
+  .bn-item span { font-size: 11px; font-weight: 500; }
+  .bn-item.active { color: var(--gold); }
+  .bn-item .bn-dot {
+    width: 4px; height: 4px; border-radius: 50%; background: var(--gold);
+    opacity: 0; transform: translateY(-2px);
+  }
+  .bn-item.active .bn-dot { opacity: 1; }
+
+  /* ===== Picker overlay (Kitab → Pasal → Ayat) ===== */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(13,15,21,0.82);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  @media (min-width: 640px) { .overlay { align-items: center; } }
+
+  .sheet {
+    background: var(--panel);
+    border: 1px solid var(--border-2);
+    width: 100%;
+    max-width: 32rem;
+    height: 85vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    border-radius: 20px 20px 0 0;
+  }
+  @media (min-width: 640px) { .sheet { border-radius: 18px; height: 78vh; } }
+
+  .sheet-grabber { width: 36px; height: 4px; border-radius: 999px; background: var(--border-2); margin: 10px auto 2px; flex-shrink: 0; }
+  @media (min-width: 640px) { .sheet-grabber { display: none; } }
+
+  .sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; gap: 10px;
+  }
+  .sheet-tabs { display: flex; align-items: center; gap: 6px; flex: 1; overflow-x: auto; }
+  .sheet-crumb {
+    font-size: 13px; color: var(--muted-2); display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .sheet-crumb button { color: var(--muted); }
+  .sheet-crumb button.current { color: var(--gold); font-weight: 600; }
+  .sheet-crumb .sep { color: var(--faint); }
+
+  .testament-toggle { display: flex; gap: 4px; background: var(--bg-deep); border-radius: 999px; padding: 4px; flex-shrink: 0; }
+  .testament-toggle button { font-size: 12px; padding: 6px 12px; border-radius: 999px; color: var(--muted); }
+  .testament-toggle button.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+
+  .sheet-close { color: var(--muted-2); flex-shrink: 0; }
+  .sheet-close:hover { color: var(--ink); }
+
+  .sheet-body { overflow-y: auto; padding: 14px; flex: 1; }
+
+  .book-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  @media (min-width: 480px) { .book-grid { grid-template-columns: repeat(3, 1fr); } }
+  .book-grid button {
+    font-size: 14px; text-align: left; padding: 11px 12px; border-radius: 10px;
+    color: #c4c9d8; background: var(--bg-deep);
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .book-grid button:hover { background: #262b3a; }
+  .book-grid button.active { background: rgba(201,168,92,0.15); color: var(--gold); }
+  .book-grid button .chev { color: var(--faint); flex-shrink: 0; }
+
+  .num-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  @media (min-width: 480px) { .num-grid { grid-template-columns: repeat(8, 1fr); } }
+  .num-grid button {
+    font-size: 14px; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; color: #c4c9d8; background: var(--bg-deep);
+  }
+  .num-grid button:hover { background: #262b3a; }
+  .num-grid button.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+
+  .section-label { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted-2); margin: 4px 2px 10px; }
+
+  .spin { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbars */
+  .page::-webkit-scrollbar, .sheet-body::-webkit-scrollbar, .sheet-tabs::-webkit-scrollbar { width: 6px; height: 0; }
+  .page::-webkit-scrollbar-thumb, .sheet-body::-webkit-scrollbar-thumb { background: #3a3f4d; border-radius: 3px; }
+  .page::-webkit-scrollbar-track, .sheet-body::-webkit-scrollbar-track { background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      <span>Alkitab-NathanDev</span>
+    </div>
+
+    <button class="current-ref-btn font-serif" id="currentRefBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+      <span id="currentRefLabel"></span>
+    </button>
+  </header>
+
+  <!-- Pages -->
+  <div class="pages">
+    <!-- Reader page -->
+    <main id="readerPage" class="page active">
+      <div class="reader">
+        <p class="eyebrow" id="eyebrow"></p>
+        <h1 class="chapter-title font-serif" id="chapterTitle"></h1>
+
+        <div class="loading-row" id="loadingRow" style="display:none">
+          <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+          Memuat ayat...
+        </div>
+
+        <div class="error-row" id="errorRow" style="display:none"></div>
+
+        <div class="verses font-serif" id="versesContainer"></div>
+
+        <div class="chapter-nav">
+          <button id="prevChapterBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+            Pasal sebelumnya
+          </button>
+          <button id="nextChapterBtn">
+            Pasal berikutnya
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+        </div>
+
+        <p class="footnote">Teks: Alkitab Yang Terbuka (AYT) — Yayasan Lembaga SABDA</p>
+      </div>
+    </main>
+
+    <!-- Search page -->
+    <section id="searchPage" class="page">
+      <div class="search-page-inner">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+          <input id="searchInput" type="text" placeholder="Cari kata atau frasa, mis. kasih, terang..." autocomplete="off" />
+          <button class="search-clear-btn" id="searchClearBtn" aria-label="Hapus pencarian">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+          </button>
+        </div>
+        <div id="searchResultsWrap"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Bottom navigation -->
+  <nav class="bottom-nav">
+    <button class="bn-item active" id="navReadBtn" data-page="readerPage">
+      <span class="bn-dot"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      <span>Baca</span>
+    </button>
+    <button class="bn-item" id="navBooksBtn">
+      <span class="bn-dot"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+      <span>Daftar Kitab</span>
+    </button>
+    <button class="bn-item" id="navSearchBtn" data-page="searchPage">
+      <span class="bn-dot"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <span>Cari</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Picker overlay: Kitab > Pasal > Ayat -->
+<div class="overlay" id="overlay">
+  <div class="sheet" id="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div class="sheet-tabs" id="sheetTabs">
+        <div class="testament-toggle" id="testamentToggle">
+          <button data-t="PL">PL</button>
+          <button data-t="PB">PB</button>
+        </div>
+      </div>
+      <button class="sheet-close" id="sheetCloseBtn" aria-label="Tutup">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+      </button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SOURCE = "claude-artifact-bible-reader";
+
+  const BOOKS = [
+    { abbr: "Kej", name: "Kejadian", chapters: 50, testament: "PL" },
+    { abbr: "Kel", name: "Keluaran", chapters: 40, testament: "PL" },
+    { abbr: "Im", name: "Imamat", chapters: 27, testament: "PL" },
+    { abbr: "Bil", name: "Bilangan", chapters: 36, testament: "PL" },
+    { abbr: "Ul", name: "Ulangan", chapters: 34, testament: "PL" },
+    { abbr: "Yos", name: "Yosua", chapters: 24, testament: "PL" },
+    { abbr: "Hak", name: "Hakim-hakim", chapters: 21, testament: "PL" },
+    { abbr: "Rut", name: "Rut", chapters: 4, testament: "PL" },
+    { abbr: "1Sam", name: "1 Samuel", chapters: 31, testament: "PL" },
+    { abbr: "2Sam", name: "2 Samuel", chapters: 24, testament: "PL" },
+    { abbr: "1Raj", name: "1 Raja-raja", chapters: 22, testament: "PL" },
+    { abbr: "2Raj", name: "2 Raja-raja", chapters: 25, testament: "PL" },
+    { abbr: "1Taw", name: "1 Tawarikh", chapters: 29, testament: "PL" },
+    { abbr: "2Taw", name: "2 Tawarikh", chapters: 36, testament: "PL" },
+    { abbr: "Ezr", name: "Ezra", chapters: 10, testament: "PL" },
+    { abbr: "Neh", name: "Nehemia", chapters: 13, testament: "PL" },
+    { abbr: "Est", name: "Ester", chapters: 10, testament: "PL" },
+    { abbr: "Ayb", name: "Ayub", chapters: 42, testament: "PL" },
+    { abbr: "Mzm", name: "Mazmur", chapters: 150, testament: "PL" },
+    { abbr: "Ams", name: "Amsal", chapters: 31, testament: "PL" },
+    { abbr: "Pkh", name: "Pengkhotbah", chapters: 12, testament: "PL" },
+    { abbr: "Kid", name: "Kidung Agung", chapters: 8, testament: "PL" },
+    { abbr: "Yes", name: "Yesaya", chapters: 66, testament: "PL" },
+    { abbr: "Yer", name: "Yeremia", chapters: 52, testament: "PL" },
+    { abbr: "Rat", name: "Ratapan", chapters: 5, testament: "PL" },
+    { abbr: "Yeh", name: "Yehezkiel", chapters: 48, testament: "PL" },
+    { abbr: "Dan", name: "Daniel", chapters: 12, testament: "PL" },
+    { abbr: "Hos", name: "Hosea", chapters: 14, testament: "PL" },
+    { abbr: "Yl", name: "Yoel", chapters: 3, testament: "PL" },
+    { abbr: "Am", name: "Amos", chapters: 9, testament: "PL" },
+    { abbr: "Ob", name: "Obaja", chapters: 1, testament: "PL" },
+    { abbr: "Yun", name: "Yunus", chapters: 4, testament: "PL" },
+    { abbr: "Mi", name: "Mikha", chapters: 7, testament: "PL" },
+    { abbr: "Nah", name: "Nahum", chapters: 3, testament: "PL" },
+    { abbr: "Hab", name: "Habakuk", chapters: 3, testament: "PL" },
+    { abbr: "Zef", name: "Zefanya", chapters: 3, testament: "PL" },
+    { abbr: "Hag", name: "Hagai", chapters: 2, testament: "PL" },
+    { abbr: "Za", name: "Zakharia", chapters: 14, testament: "PL" },
+    { abbr: "Mal", name: "Maleakhi", chapters: 4, testament: "PL" },
+    { abbr: "Mat", name: "Matius", chapters: 28, testament: "PB" },
+    { abbr: "Mrk", name: "Markus", chapters: 16, testament: "PB" },
+    { abbr: "Luk", name: "Lukas", chapters: 24, testament: "PB" },
+    { abbr: "Yoh", name: "Yohanes", chapters: 21, testament: "PB" },
+    { abbr: "Kis", name: "Kisah Para Rasul", chapters: 28, testament: "PB" },
+    { abbr: "Rm", name: "Roma", chapters: 16, testament: "PB" },
+    { abbr: "1Kor", name: "1 Korintus", chapters: 16, testament: "PB" },
+    { abbr: "2Kor", name: "2 Korintus", chapters: 13, testament: "PB" },
+    { abbr: "Gal", name: "Galatia", chapters: 6, testament: "PB" },
+    { abbr: "Ef", name: "Efesus", chapters: 6, testament: "PB" },
+    { abbr: "Flp", name: "Filipi", chapters: 4, testament: "PB" },
+    { abbr: "Kol", name: "Kolose", chapters: 4, testament: "PB" },
+    { abbr: "1Tes", name: "1 Tesalonika", chapters: 5, testament: "PB" },
+    { abbr: "2Tes", name: "2 Tesalonika", chapters: 3, testament: "PB" },
+    { abbr: "1Tim", name: "1 Timotius", chapters: 6, testament: "PB" },
+    { abbr: "2Tim", name: "2 Timotius", chapters: 4, testament: "PB" },
+    { abbr: "Tit", name: "Titus", chapters: 3, testament: "PB" },
+    { abbr: "Flm", name: "Filemon", chapters: 1, testament: "PB" },
+    { abbr: "Ibr", name: "Ibrani", chapters: 13, testament: "PB" },
+    { abbr: "Yak", name: "Yakobus", chapters: 5, testament: "PB" },
+    { abbr: "1Ptr", name: "1 Petrus", chapters: 5, testament: "PB" },
+    { abbr: "2Ptr", name: "2 Petrus", chapters: 3, testament: "PB" },
+    { abbr: "1Yoh", name: "1 Yohanes", chapters: 5, testament: "PB" },
+    { abbr: "2Yoh", name: "2 Yohanes", chapters: 1, testament: "PB" },
+    { abbr: "3Yoh", name: "3 Yohanes", chapters: 1, testament: "PB" },
+    { abbr: "Yud", name: "Yudas", chapters: 1, testament: "PB" },
+    { abbr: "Why", name: "Wahyu", chapters: 22, testament: "PB" },
+  ];
+
+  function bookByAbbr(abbr) { return BOOKS.find(b => b.abbr === abbr); }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function highlightMatch(text, query) {
+    const escaped = escapeHtml(text);
+    if (!query) return escaped;
+    const re = new RegExp(escapeRegex(escapeHtml(query)), "ig");
+    return escaped.replace(re, (m) => `<mark>${m}</mark>`);
+  }
+
+  // ===== Posisi terakhir (tersimpan di perangkat ini) =====
+  const LAST_POSITION_KEY = "alkitab:last-position";
+
+  function loadLastPosition() {
+    try {
+      const raw = localStorage.getItem(LAST_POSITION_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && bookByAbbr(parsed.book) && Number(parsed.chapter) > 0) {
+        return { book: parsed.book, chapter: Number(parsed.chapter) };
+      }
+    } catch (e) { /* abaikan data tersimpan yang rusak */ }
+    return null;
+  }
+
+  function saveLastPosition(book, chapter) {
+    try {
+      localStorage.setItem(LAST_POSITION_KEY, JSON.stringify({ book, chapter }));
+    } catch (e) { /* penyimpanan tidak tersedia, lewati saja */ }
+  }
+
+  const lastPosition = loadLastPosition();
+
+  // ===== State =====
+  let state = {
+    activeBook: lastPosition ? lastPosition.book : "Kej",
+    activeChapter: lastPosition ? lastPosition.chapter : 1,
+    highlightVerse: null,
+    sheetStep: "testament", // testament -> books -> chapters -> verses
+    sheetTestament: "PB",
+    sheetBook: null,
+  };
+
+  let currentVerseList = [];
+  let highlightTimeout = null;
+  let searchDebounce = null;
+
+  // ===== DOM refs =====
+  const $ = (id) => document.getElementById(id);
+  const currentRefBtn = $("currentRefBtn");
+  const currentRefLabel = $("currentRefLabel");
+  const eyebrow = $("eyebrow");
+  const chapterTitle = $("chapterTitle");
+  const loadingRow = $("loadingRow");
+  const errorRow = $("errorRow");
+  const versesContainer = $("versesContainer");
+  const prevChapterBtn = $("prevChapterBtn");
+  const nextChapterBtn = $("nextChapterBtn");
+  const readerPage = $("readerPage");
+  const searchPage = $("searchPage");
+  const searchInput = $("searchInput");
+  const searchClearBtn = $("searchClearBtn");
+  const searchResultsWrap = $("searchResultsWrap");
+  const navReadBtn = $("navReadBtn");
+  const navBooksBtn = $("navBooksBtn");
+  const navSearchBtn = $("navSearchBtn");
+  const overlay = $("overlay");
+  const sheet = $("sheet");
+  const sheetTabs = $("sheetTabs");
+  const sheetBody = $("sheetBody");
+  const sheetCloseBtn = $("sheetCloseBtn");
+  const testamentToggle = $("testamentToggle");
+
+  // ===== Reader =====
+  async function fetchChapter(bookAbbr, chapter) {
+    loadingRow.style.display = "flex";
+    errorRow.style.display = "none";
+    versesContainer.innerHTML = "";
+    try {
+      const url = `https://api.ayt.co/v1/bible.php?book=${encodeURIComponent(bookAbbr)}&chapter=${chapter}&source=${SOURCE}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Gagal memuat data");
+      const json = await res.json();
+      const bookKey = Object.keys(json)[0];
+      if (!bookKey) throw new Error("Pasal tidak ditemukan");
+      const chapterData = json[bookKey].data[String(chapter)];
+      const list = Object.values(chapterData).sort((a, b) => Number(a.verse) - Number(b.verse));
+      currentVerseList = list;
+      renderVerses(list);
+      if (state.highlightVerse) scrollToVerse(state.highlightVerse);
+    } catch (e) {
+      errorRow.textContent = "Tidak dapat memuat pasal ini. Periksa koneksi dan coba lagi.";
+      errorRow.style.display = "block";
+    } finally {
+      loadingRow.style.display = "none";
+    }
+  }
+
+  function renderVerses(list) {
+    let html = "";
+    list.forEach((v, i) => {
+      if (v.title) {
+        html += `<span class="verse-section-title${i === 0 ? " first" : ""}">${escapeHtml(v.title)}</span>`;
+      }
+      const isHighlight = Number(v.verse) === state.highlightVerse;
+      html += `<div class="verse-line${isHighlight ? " verse-highlight" : ""}" id="verse-${v.verse}">` +
+              `<span class="verse-num">${v.verse}</span>` +
+              `<span class="verse-text">${escapeHtml(v.text)}</span>` +
+              `</div>`;
+    });
+    versesContainer.innerHTML = html;
+  }
+
+  function scrollToVerse(verseNum) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`verse-${verseNum}`);
+      if (el) el.scrollIntoView({ block: "center" });
+    });
+  }
+
+  function renderHeader() {
+    const b = bookByAbbr(state.activeBook);
+    eyebrow.textContent = `${b.testament === "PL" ? "Perjanjian Lama" : "Perjanjian Baru"} · AYT`;
+    chapterTitle.innerHTML = `${escapeHtml(b.name)} <span class="num">${state.activeChapter}</span>`;
+    currentRefLabel.textContent = `${b.name} ${state.activeChapter}`;
+  }
+
+  function goToChapter(bookAbbr, chapter, verse) {
+    state.activeBook = bookAbbr;
+    state.activeChapter = chapter;
+    state.highlightVerse = verse || null;
+    saveLastPosition(bookAbbr, chapter);
+    renderHeader();
+    fetchChapter(bookAbbr, chapter);
+    if (!verse) readerPage.scrollTo({ top: 0 });
+    if (state.highlightVerse) {
+      clearTimeout(highlightTimeout);
+      highlightTimeout = setTimeout(() => {
+        state.highlightVerse = null;
+        renderVerses(currentVerseList);
+      }, 3500);
+    }
+  }
+
+  function goChapterDelta(delta) {
+    const idx = BOOKS.findIndex(b => b.abbr === state.activeBook);
+    let newChapter = state.activeChapter + delta;
+    let newIdx = idx;
+    if (newChapter < 1) {
+      newIdx = idx - 1;
+      if (newIdx < 0) return;
+      newChapter = BOOKS[newIdx].chapters;
+    } else if (newChapter > BOOKS[idx].chapters) {
+      newIdx = idx + 1;
+      if (newIdx >= BOOKS.length) return;
+      newChapter = 1;
+    }
+    goToPage("readerPage");
+    goToChapter(BOOKS[newIdx].abbr, newChapter, null);
+  }
+
+  prevChapterBtn.addEventListener("click", () => goChapterDelta(-1));
+  nextChapterBtn.addEventListener("click", () => goChapterDelta(1));
+
+  // ===== Bottom-nav page switching =====
+  function goToPage(pageId) {
+    [readerPage, searchPage].forEach(p => p.classList.toggle("active", p.id === pageId));
+    [navReadBtn, navSearchBtn].forEach(btn => btn.classList.toggle("active", btn.dataset.page === pageId));
+    if (pageId !== "searchPage") {
+      navBooksBtn.classList.remove("active");
+    }
+  }
+  navReadBtn.addEventListener("click", () => goToPage("readerPage"));
+  navSearchBtn.addEventListener("click", () => {
+    goToPage("searchPage");
+    setTimeout(() => searchInput.focus(), 50);
+  });
+  navBooksBtn.addEventListener("click", () => {
+    navBooksBtn.classList.add("active");
+    navReadBtn.classList.remove("active");
+    navSearchBtn.classList.remove("active");
+    openSheet(bookByAbbr(state.activeBook).testament, "books");
+  });
+  currentRefBtn.addEventListener("click", () => {
+    openSheet(bookByAbbr(state.activeBook).testament, "books");
+  });
+
+  // ===== Picker sheet: Testament -> Books -> Chapters -> Verses =====
+  function openSheet(testament, step, book) {
+    state.sheetTestament = testament;
+    state.sheetStep = step || "books";
+    state.sheetBook = book || (step === "chapters" || step === "verses" ? state.sheetBook : null);
+    overlay.classList.add("open");
+    renderSheet();
+  }
+  function closeSheet() {
+    overlay.classList.remove("open");
+    if (searchPage.classList.contains("active")) {
+      navSearchBtn.classList.add("active");
+    } else {
+      navReadBtn.classList.add("active");
+    }
+    navBooksBtn.classList.remove("active");
+  }
+  sheetCloseBtn.addEventListener("click", closeSheet);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSheet(); });
+
+  function renderSheetTabs() {
+    if (state.sheetStep === "books") {
+      sheetTabs.innerHTML = `<div class="testament-toggle" id="testamentToggleDyn">
+        <button data-t="PL">PL</button><button data-t="PB">PB</button>
+      </div>`;
+      const tt = $("testamentToggleDyn");
+      [...tt.children].forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.t === state.sheetTestament);
+        btn.addEventListener("click", () => {
+          state.sheetTestament = btn.dataset.t;
+          renderSheet();
+        });
+      });
+    } else if (state.sheetStep === "chapters") {
+      sheetTabs.innerHTML = `<div class="sheet-crumb">
+        <button id="crumbBooks">Kitab</button>
+        <span class="sep">›</span>
+        <button class="current">${escapeHtml(state.sheetBook.name)}</button>
+      </div>`;
+      $("crumbBooks").addEventListener("click", () => openSheet(state.sheetTestament, "books"));
+    } else if (state.sheetStep === "verses") {
+      sheetTabs.innerHTML = `<div class="sheet-crumb">
+        <button id="crumbBooks2">Kitab</button>
+        <span class="sep">›</span>
+        <button id="crumbChapters">${escapeHtml(state.sheetBook.name)} ${state.sheetChapter}</button>
+        <span class="sep">›</span>
+        <button class="current">Ayat</button>
+      </div>`;
+      $("crumbBooks2").addEventListener("click", () => openSheet(state.sheetTestament, "books"));
+      $("crumbChapters").addEventListener("click", () => openSheet(state.sheetTestament, "chapters", state.sheetBook));
+    }
+  }
+
+  function renderSheet() {
+    renderSheetTabs();
+    if (state.sheetStep === "books") {
+      const books = BOOKS.filter(b => b.testament === state.sheetTestament);
+      sheetBody.innerHTML = `<p class="section-label">${state.sheetTestament === "PL" ? "Perjanjian Lama · 39 kitab" : "Perjanjian Baru · 27 kitab"}</p>
+        <div class="book-grid">${books.map(b => `
+          <button data-abbr="${b.abbr}" class="${b.abbr === state.activeBook ? "active" : ""}">
+            <span>${escapeHtml(b.name)}</span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+        `).join("")}</div>`;
+      sheetBody.querySelectorAll("button[data-abbr]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          openSheet(state.sheetTestament, "chapters", bookByAbbr(btn.dataset.abbr));
+        });
+      });
+    } else if (state.sheetStep === "chapters") {
+      const chapters = Array.from({ length: state.sheetBook.chapters }, (_, i) => i + 1);
+      sheetBody.innerHTML = `<p class="section-label">Pilih pasal</p>
+        <div class="num-grid">${chapters.map(c => `
+          <button data-c="${c}" class="${state.sheetBook.abbr === state.activeBook && c === state.activeChapter ? "active" : ""}">${c}</button>
+        `).join("")}</div>`;
+      sheetBody.querySelectorAll("button[data-c]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.sheetChapter = Number(btn.dataset.c);
+          openSheet(state.sheetTestament, "verses", state.sheetBook);
+          loadVersesForPicker(state.sheetBook.abbr, state.sheetChapter);
+        });
+      });
+    } else if (state.sheetStep === "verses") {
+      sheetBody.innerHTML = `<p class="section-label">Memuat daftar ayat...</p>`;
+    }
+  }
+
+  async function loadVersesForPicker(bookAbbr, chapter) {
+    try {
+      const url = `https://api.ayt.co/v1/bible.php?book=${encodeURIComponent(bookAbbr)}&chapter=${chapter}&source=${SOURCE}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const bookKey = Object.keys(json)[0];
+      const chapterData = json[bookKey].data[String(chapter)];
+      const list = Object.values(chapterData).sort((a, b) => Number(a.verse) - Number(b.verse));
+      if (state.sheetStep !== "verses") return;
+      sheetBody.innerHTML = `<p class="section-label">${list.length} ayat — pilih untuk langsung dibaca</p>
+        <div class="num-grid">${list.map(v => `
+          <button data-v="${v.verse}" class="${bookAbbr === state.activeBook && chapter === state.activeChapter && Number(v.verse) === state.highlightVerse ? "active" : ""}">${v.verse}</button>
+        `).join("")}</div>`;
+      sheetBody.querySelectorAll("button[data-v]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          goToPage("readerPage");
+          goToChapter(bookAbbr, chapter, Number(btn.dataset.v));
+          closeSheet();
+        });
+      });
+    } catch (e) {
+      sheetBody.innerHTML = `<p class="section-label">Gagal memuat daftar ayat.</p>`;
+    }
+  }
+
+  testamentToggle.style.display = "none"; // replaced dynamically inside sheetTabs
+
+  // ===== Search page (app-style: live results as cards) =====
+  function clearSearchUI() {
+    searchResultsWrap.innerHTML = `<p class="search-hint">Ketik minimal 2 huruf untuk mencari ayat di seluruh Alkitab.</p>`;
+    searchClearBtn.classList.remove("show");
+  }
+  clearSearchUI();
+
+  async function runSearch(q) {
+    if (!q || q.trim().length < 2) {
+      clearSearchUI();
+      return;
+    }
+    searchResultsWrap.innerHTML = `<div class="search-status">
+      <svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+      Mencari &ldquo;${escapeHtml(q)}&rdquo;...
+    </div>`;
+    try {
+      const url = `https://api.ayt.co/v1/search.php?search=${encodeURIComponent(q)}&source=${SOURCE}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const docs = json && json.response && json.response.docs ? Object.values(json.response.docs) : [];
+      const trimmed = docs.slice(0, 40);
+      if (trimmed.length === 0) {
+        searchResultsWrap.innerHTML = `<div class="search-empty">Tidak ada ayat yang cocok dengan &ldquo;${escapeHtml(q)}&rdquo;.</div>`;
+        return;
+      }
+      searchResultsWrap.innerHTML =
+        `<p class="search-result-count">${trimmed.length} ayat ditemukan</p>` +
+        trimmed.map(doc => `
+          <button class="search-result-card" data-abbr="${doc.abbr}" data-chapter="${doc.chapter}" data-verse="${doc.verse}">
+            <div class="search-result-ref-row">
+              <span class="search-result-ref-badge">${escapeHtml(doc.name)} ${doc.chapter}</span>
+              <span class="search-result-ref-verse">Ayat ${doc.verse}</span>
+            </div>
+            <div class="search-result-text font-serif">${highlightMatch(doc.text, q)}</div>
+          </button>
+        `).join("");
+      searchResultsWrap.querySelectorAll(".search-result-card").forEach(card => {
+        card.addEventListener("click", () => {
+          goToPage("readerPage");
+          goToChapter(card.dataset.abbr, Number(card.dataset.chapter), Number(card.dataset.verse));
+        });
+      });
+    } catch (e) {
+      searchResultsWrap.innerHTML = `<div class="search-empty">Pencarian gagal. Periksa koneksi dan coba lagi.</div>`;
+    }
+  }
+
+  searchInput.addEventListener("input", () => {
+    searchClearBtn.classList.toggle("show", !!searchInput.value);
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => runSearch(searchInput.value), 400);
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { clearTimeout(searchDebounce); runSearch(searchInput.value); }
+  });
+  searchClearBtn.addEventListener("click", () => {
+    searchInput.value = "";
+    searchClearBtn.classList.remove("show");
+    clearSearchUI();
+    searchInput.focus();
+  });
+
+  // ===== Init =====
+  renderHeader();
+  saveLastPosition(state.activeBook, state.activeChapter);
+  fetchChapter(state.activeBook, state.activeChapter);
+})();
+</script>
+</body>
+</html>
